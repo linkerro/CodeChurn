@@ -13,22 +13,25 @@ namespace GitQuery
     {
         static void Main(string[] args)
         {
-            using (var repo = new Repository(@"C:\Users\r.iscu\Documents\GitHub\enki.js"))
+            var enkiPath = @"C:\Users\r.iscu\Documents\GitHub\enki.js";
+            var beetleMailPath = @"C:\Work\BeetleMailer";
+
+            using (var repo = new Repository(beetleMailPath))
             {
-                var RFC2822Format = "ddd dd MMM HH:mm:ss yyyy K";
+                //var RFC2822Format = "ddd dd MMM HH:mm:ss yyyy K";
 
                 var commits = repo.Commits.ToList();
-                var commitNotes = commits.Select(c => c.GetType()).ToList();
-                var trees = commits
-                    .Select(c => c.Tree)
+                var commitInfo = commits
+                    .Select(c => new
+                    {
+                        commit = c,
+                        parents = c.Parents.ToList(),
+                        diffs = c.Parents.Select(p => repo.Diff.Compare<TreeChanges>(c.Tree, p.Tree)).ToList()
+                    })
                     .ToList();
-                var diffs = trees
-                    .Skip(1)
-                    .Select(t => repo.Diff.Compare<TreeChanges>(t, GetLastTree(t, trees)))
-                    .ToList();
-                var fileModifications = diffs
-                    .SelectMany(d => d.Modified)
-                    .GroupBy(c => c.Path)
+
+                var groupedInfo = commitInfo
+                    .GroupBy(c => c.diffs.SelectMany(d => d.Modified))
                     .ToList();
             }
             Console.ReadKey();
@@ -36,7 +39,7 @@ namespace GitQuery
 
         private static Tree GetLastTree(Tree tree, List<Tree> trees)
         {
-            return trees[trees.IndexOf(tree)-1];
+            return trees[trees.IndexOf(tree) - 1];
         }
 
         private static void ListCommits(Repository repo, string rfc2822Format)
