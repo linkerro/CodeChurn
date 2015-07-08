@@ -18,7 +18,9 @@ namespace GitQuery
 
             using (var repo = new Repository(beetleMailPath))
             {
-                //var RFC2822Format = "ddd dd MMM HH:mm:ss yyyy K";
+                var files = repo.Head.Tip.Tree.Select(t => t.Path).ToList();
+                var test = repo.Index.ToList();
+                var diffs = files.Select(f => repo.Commits).ToList();
 
                 var commits = repo.Commits.ToList();
                 var commitInfo = commits
