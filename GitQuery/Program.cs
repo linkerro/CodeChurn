@@ -18,23 +18,12 @@ namespace GitQuery
 
             using (var repo = new Repository(beetleMailPath))
             {
-                var files = repo.Head.Tip.Tree.Select(t => t.Path).ToList();
-                var test = repo.Index.ToList();
-                var diffs = files.Select(f => repo.Commits).ToList();
-
-                var commits = repo.Commits.ToList();
-                var commitInfo = commits
-                    .Select(c => new
-                    {
-                        commit = c,
-                        parents = c.Parents.ToList(),
-                        diffs = c.Parents.Select(p => repo.Diff.Compare<TreeChanges>(c.Tree, p.Tree)).ToList()
-                    })
+                var status= repo
+                    .RetrieveStatus(new StatusOptions() {IncludeUnaltered = true})
+                    .Where(s=>s.State!=FileStatus.Ignored&&s.State!=FileStatus.NewInWorkdir)
+                    .Select(s=>s.FilePath)
                     .ToList();
-
-                var groupedInfo = commitInfo
-                    .GroupBy(c => c.diffs.SelectMany(d => d.Modified))
-                    .ToList();
+                var diffs = status.Select(f => new {path=f,history= repo.Commits.QueryBy(f).ToList() } ).ToList();
             }
             Console.ReadKey();
         }
