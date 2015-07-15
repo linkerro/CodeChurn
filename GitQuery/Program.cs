@@ -15,15 +15,36 @@ namespace GitQuery
         {
             var enkiPath = @"C:\Users\r.iscu\Documents\GitHub\enki.js";
             var beetleMailPath = @"C:\Work\BeetleMailer";
+            var enkiPath2 = @"C:\Users\linke\Documents\GitHub\enki.js";
 
-            using (var repo = new Repository(beetleMailPath))
+            using (var repo = new Repository(enkiPath2))
             {
-                var status= repo
+                var files = repo
                     .RetrieveStatus(new StatusOptions() {IncludeUnaltered = true})
-                    .Where(s=>s.State!=FileStatus.Ignored&&s.State!=FileStatus.NewInWorkdir)
-                    .Select(s=>s.FilePath)
+                    .Where(s => s.State != FileStatus.Ignored && s.State != FileStatus.NewInWorkdir)
+                    .Select(s => s.FilePath)
                     .ToList();
-                var diffs = status.Select(f => new {path=f,history= repo.Commits.QueryBy(f).ToList() } ).ToList();
+                var diffs =
+                    files.Select(f => new {path = f, history = repo.Commits.QueryBy(f).Select(x => x.Commit).ToList()})
+                        .ToList();
+
+                var patches =
+                    diffs.Select(
+                        d =>
+                            new
+                            {
+                                path = d.path,
+                                history =
+                                    d.history.Where(p => p.Parents.Any())
+                                        .SelectMany(
+                                            c =>
+                                                repo.Diff.Compare<Patch>(c.Tree, c.Parents.First().Tree)
+                                                    .Where(p => p.Path == d.path)
+                                                    .ToArray())
+                                        .ToArray()
+                            }).ToArray();
+
+
             }
             Console.ReadKey();
         }
