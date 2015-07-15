@@ -18,14 +18,34 @@ namespace GitQuery
 
             using (var repo = new Repository(beetleMailPath))
             {
-                var status= repo
-                    .RetrieveStatus(new StatusOptions() {IncludeUnaltered = true})
-                    .Where(s=>s.State!=FileStatus.Ignored&&s.State!=FileStatus.NewInWorkdir)
-                    .Select(s=>s.FilePath)
-                    .ToList();
-                var diffs = status.Select(f => new {path=f,history= repo.Commits.QueryBy(f).ToList() } ).ToList();
+                var commits = repo
+                    .Commits.ToArray();
+                var commitInfo = commits
+                    .Select(c => new CommitInfo()
+                    {
+                        commit = c,
+                        parents = c.Parents.ToList(),
+                        diffs = c.Parents.Select(p => repo
+                        .Diff
+                        .Compare<TreeChanges>(c.Tree, p.Tree))
+                        .SelectMany(tc => tc.Where(ch => ch.Status == ChangeKind.Modified).ToArray())
+                        .ToArray()
+                    })
+                    .ToArray();
+                var fileDiffs = new Dictionary<string, CommitInfo>();
+                var files = commitInfo.SelectMany(ci => ci.diffs.Select(d => d.Path)).Distinct();
+                var diffs =
+                    files.Select(
+                        f => new { commits = commitInfo.Where(ci => ci.diffs.Any(d => d.Path == f)).ToArray(), file = f }).ToArray();
             }
             Console.ReadKey();
+        }
+
+        class CommitInfo
+        {
+            public Commit commit;
+            public IEnumerable<Commit> parents;
+            public IEnumerable<TreeEntryChanges> diffs;
         }
 
         private static Tree GetLastTree(Tree tree, List<Tree> trees)
