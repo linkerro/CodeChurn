@@ -15,37 +15,38 @@ namespace GitQuery
         {
             var enkiPath = @"C:\Users\r.iscu\Documents\GitHub\enki.js";
             var beetleMailPath = @"C:\Work\BeetleMailer";
+            var enkiPath2 = @"C:\Users\linke\Documents\GitHub\enki.js";
 
-            using (var repo = new Repository(beetleMailPath))
+            using (var repo = new Repository(enkiPath2))
             {
-                var commits = repo
-                    .Commits.ToArray();
-                var commitInfo = commits
-                    .Select(c => new CommitInfo()
-                    {
-                        commit = c,
-                        parents = c.Parents.ToList(),
-                        diffs = c.Parents.Select(p => repo
-                        .Diff
-                        .Compare<TreeChanges>(c.Tree, p.Tree))
-                        .SelectMany(tc => tc.Where(ch => ch.Status == ChangeKind.Modified).ToArray())
-                        .ToArray()
-                    })
-                    .ToArray();
-                var fileDiffs = new Dictionary<string, CommitInfo>();
-                var files = commitInfo.SelectMany(ci => ci.diffs.Select(d => d.Path)).Distinct();
+                var files = repo
+                    .RetrieveStatus(new StatusOptions() {IncludeUnaltered = true})
+                    .Where(s => s.State != FileStatus.Ignored && s.State != FileStatus.NewInWorkdir)
+                    .Select(s => s.FilePath)
+                    .ToList();
                 var diffs =
-                    files.Select(
-                        f => new { commits = commitInfo.Where(ci => ci.diffs.Any(d => d.Path == f)).ToArray(), file = f }).ToArray();
+                    files.Select(f => new {path = f, history = repo.Commits.QueryBy(f).Select(x => x.Commit).ToList()})
+                        .ToList();
+
+                var patches =
+                    diffs.Select(
+                        d =>
+                            new
+                            {
+                                path = d.path,
+                                history =
+                                    d.history.Where(p => p.Parents.Any())
+                                        .SelectMany(
+                                            c =>
+                                                repo.Diff.Compare<Patch>(c.Tree, c.Parents.First().Tree)
+                                                    .Where(p => p.Path == d.path)
+                                                    .ToArray())
+                                        .ToArray()
+                            }).ToArray();
+
+
             }
             Console.ReadKey();
-        }
-
-        class CommitInfo
-        {
-            public Commit commit;
-            public IEnumerable<Commit> parents;
-            public IEnumerable<TreeEntryChanges> diffs;
         }
 
         private static Tree GetLastTree(Tree tree, List<Tree> trees)
