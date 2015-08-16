@@ -41,7 +41,9 @@ namespace GitQuery
                                                 repo.Diff.Compare<Patch>(c.Tree, c.Parents.First().Tree)
                                                     .Where(p => p.Path == d.path)
                                                     .ToArray())
-                                        .ToArray()
+                                        .ToArray(),
+                                commits=d.history,
+                                notes=d.history.Select(c=>c.Notes).ToArray()
                             }).ToArray();
 
 

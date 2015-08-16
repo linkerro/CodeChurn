@@ -1,0 +1,105 @@
+﻿<div>
+    <label for="repositoryPath">Path to git repository</label>
+    <input type="text" id="repositoryPath" data-bind="value: path" />
+    <input type="button" id="listFiles" value="load" data-bind="click: getPatches" />
+</div>
+<div data-bind="visible: showFiles">
+    <div data-bind="foreach: files">
+        <div>
+            <div data-bind="text: path"></div>
+            @*<highchart params="info: $data, id: $index"></highchart>*@
+            <div data-bind="component: {name:'highchart',params:{info:$data, id: $index}}"></div>
+        </div>
+    </div>
+</div>
+@section scripts
+{
+    <script type="text/javascript" src="~/Scripts/knockout-3.3.0.js"></script>
+    <script type="text/javascript" src="http://code.highcharts.com/highcharts.js"></script>
+    <script type="text/javascript">
+        var ViewModel = function () {
+            var self = {};
+            self.showFiles = ko.observable(false);
+            self.files = ko.observableArray();
+            self.path = ko.observable();
+            self.getPatches = function () {
+                var url = '/api/git?path=' + encodeURI(self.path());
+                $.get(url, function (response) {
+                    var mappedResponse = response
+                        .map(function (fileItem) {
+                        return {
+                            path: fileItem.path,
+                            series: [
+                                {
+                                    name: 'Aditions',
+                                    data: fileItem.history.map(function (entry) {
+                                        return [new Date(entry.When).getTime(), entry.LinesAdded];
+                                    })
+                                },
+                                {
+                                    name: 'Deletions',
+                                    data: fileItem.history.map(function (entry) {
+                                        return [new Date(entry.When).getTime(), entry.LinesDeleted];
+                                    })
+                                }
+
+                            ]
+                        }
+                    });
+                    self.files(mappedResponse);
+                    self.showFiles(true);
+                });
+            };
+            return self;
+        };
+        ko.components.register('highchart', {
+            viewModel: function (params) {
+                var info = params.info;
+                var id = params.id();
+                var self = this;
+                self.id = 'chart'+id;
+                self.chartInfo = {
+                    chart: {
+                        type: 'areaspline',
+                        renderTo: self.id
+                    },
+                    colors:['#eaffea','#ffecec'],
+                    title: {
+                        text: info.name
+                    },
+                    xAxis: {
+                        type: 'datetime',
+                        dateTimeLabelFormats: {
+                            month: '%e. %b',
+                            year: '%b'
+                        },
+                        title: {
+                            text: 'Date'
+                        }
+                    },
+                    yAxis: {
+                        min: 0
+                    },
+                    tooltip: {
+                        headerFormat: '<b>{series.name}</b><br>',
+                        pointFormat: '{point.x:%e. %b}: {point.y}'
+                    },
+
+
+                    series: info.series
+                };
+                if (info.path === 'test\EnkiSpecs.js') {
+                    var test = JSON.stringify(self.chartInfo);
+                    debugger;
+                }
+                setTimeout(function() {
+                    var chart = new Highcharts.Chart(self.chartInfo);
+                }, 10);
+            },
+            template:
+                '<div data-bind="attr: {id:id}"></div>'
+        });
+        var viewModel = ViewModel();
+        ko.applyBindings(viewModel);
+    </script>
+}
